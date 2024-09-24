@@ -1,0 +1,138 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+
+class Process {
+    private String processName;
+    private int burstTime;
+
+    public Process(String processName, int burstTime) {
+        this.processName = processName;
+        this.burstTime = burstTime;
+    }
+
+    public String getProcessName() {
+        return processName;
+    }
+
+    public int getBurstTime() {
+        return burstTime;
+    }
+}
+
+public class SJF_CPU_Scheduling_GUI extends JFrame {
+    private DefaultListModel<String> processListModel;
+    private JList<String> processList;
+    private JButton addButton;
+    private JButton scheduleButton;
+    private JTextField processNameField;
+    private JTextField burstTimeField;
+
+    private List<Process> processes;
+
+    public SJF_CPU_Scheduling_GUI() {
+        setTitle("SJF CPU Scheduling");
+        setSize(400, 300);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        processes = new ArrayList<>();
+
+        processListModel = new DefaultListModel<>();
+        processList = new JList<>(processListModel);
+
+        addButton = new JButton("Add Process");
+        scheduleButton = new JButton("Schedule");
+        processNameField = new JTextField(10);
+        burstTimeField = new JTextField(5);
+
+        addButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                addProcess();
+            }
+        });
+
+        scheduleButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                scheduleProcesses();
+            }
+        });
+
+        setLayout(new BorderLayout());
+
+        JPanel inputPanel = new JPanel();
+        inputPanel.add(new JLabel("Process Name:"));
+        inputPanel.add(processNameField);
+        inputPanel.add(new JLabel("Burst Time:"));
+        inputPanel.add(burstTimeField);
+        inputPanel.add(addButton);
+
+        add(new JScrollPane(processList), BorderLayout.CENTER);
+        add(inputPanel, BorderLayout.NORTH);
+        add(scheduleButton, BorderLayout.SOUTH);
+    }
+
+    private void addProcess() {
+        try {
+            String processName = processNameField.getText();
+            int burstTime = Integer.parseInt(burstTimeField.getText());
+
+            Process newProcess = new Process(processName, burstTime);
+            processes.add(newProcess);
+
+            processListModel.addElement(newProcess.getProcessName() + " - " + newProcess.getBurstTime() + "ms");
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this, "Invalid burst time. Please enter a valid integer.", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void scheduleProcesses() {
+        Collections.sort(processes, Comparator.comparingInt(Process::getBurstTime));
+
+        StringBuilder result = new StringBuilder("Scheduled Order:\n");
+
+        for (Process process : processes) {
+            result.append(process.getProcessName()).append(" -> ");
+        }
+
+        result.delete(result.length() - 4, result.length()); // Remove the last " -> "
+        JOptionPane.showMessageDialog(this, result.toString(), "SJF CPU Scheduling Result", JOptionPane.INFORMATION_MESSAGE);
+
+        saveToDatabase();
+    }
+
+    private void saveToDatabase() {
+        try (Connection connection = DriverManager.getConnection("jdbc:mysql://your_database_host:your_database_port/your_database_name", "your_username", "your_password")) {
+            String insertQuery = "INSERT INTO processes (process_name, burst_time) VALUES (?, ?)";
+            try (PreparedStatement preparedStatement = connection.prepareStatement(insertQuery)) {
+                for (Process process : processes) {
+                    preparedStatement.setString(1, process.getProcessName());
+                    preparedStatement.setInt(2, process.getBurstTime());
+                    preparedStatement.executeUpdate();
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                new SJF_CPU_Scheduling_GUI().setVisible(true);
+            }
+        });
+    }
+}
